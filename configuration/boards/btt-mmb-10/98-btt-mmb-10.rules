@@ -1,0 +1,1 @@
+SUBSYSTEMS=="usb", ATTRS{idProduct}=="614e", ATTRS{idVendor}=="1d50", ATTRS{serial}=="230052000D50425539393020", ACTION=="add", SYMLINK+="btt-mmb-10"
