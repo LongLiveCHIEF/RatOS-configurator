@@ -1,0 +1,13 @@
+{
+	"$schema": "https://raw.githubusercontent.com/Rat-OS/RatOS-configurator/refs/heads/development/configuration/boards/board-definition.schema.json",
+	"name": "MMB v1.0",
+	"manufacturer": "BIGTREETECH",
+	"id": "btt-mmb-10",
+	"firmwareBinaryName": "firmware-btt-mmb-10.bin",
+	"compileScript": "compile.sh",
+	"flashScript": "flash.sh",
+	"flashInstructions": "Flashing only works if the SD card slot on the MMB is empty.",
+	"documentationLink": "https://os.ratrig.com/docs/boards/btt/mmb-10",
+	"driverCount": 4,
+	"driverVoltages": [24, 36, 48, 56],
+}
