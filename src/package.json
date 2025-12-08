@@ -3,8 +3,8 @@
 	"private": true,
 	"version": "2.1.0",
 	"scripts": {
-		"dev": "pnpm run copyScichartData && next dev | pino-pretty -c",
-		"build": "pnpm run copyScichartData && next build",
+		"dev": "pnpm run copyScichartData && NODE_OPTIONS=--inspect next dev | pino-pretty -c",
+		"build": "pnpm run copyScichartData && NODE_OPTIONS=--inspect next build",
 		"start": "sleep 1 && curl -s -o /dev/null --retry 20 --retry-all-errors --retry-delay 1 --retry-max-time 60 \"http://localhost:3000/configure\" &> /dev/null &\nnext start",
 		"lint": "next lint",
 		"lint:fix": "next lint --fix",
