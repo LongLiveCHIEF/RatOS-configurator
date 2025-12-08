@@ -1,3 +1,4 @@
+import bundleAnalyzer from '@next/bundle-analyzer';
 /**
  * Don't be scared of the generics here.
  * All they do is to give us autocompletion when using this.
@@ -10,7 +11,10 @@ function defineNextConfig(config) {
 	return config;
 }
 
-export default defineNextConfig({
+const withBundleAnalyzer = bundleAnalyzer({
+	enabled: process.env.ANALYZE === 'true',
+});
+export default withBundleAnalyzer(defineNextConfig({
 	reactStrictMode: true,
 	distDir: 'build',
 	cleanDistDir: true,
@@ -21,6 +25,9 @@ export default defineNextConfig({
 	publicRuntimeConfig: {
 		// Will be available on both server and client
 		basePath: '/configure',	
+	},
+	webpack: (config) => {
+		return config;
 	},
 	headers: async () => {
 		return [
@@ -44,4 +51,4 @@ export default defineNextConfig({
 		typedRoutes: true,
 	},
 	productionBrowserSourceMaps: true,
-});
+}));
