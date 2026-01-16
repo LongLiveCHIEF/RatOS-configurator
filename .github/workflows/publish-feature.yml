@@ -1,0 +1,140 @@
+# .github/workflows/publish.yml
+name: Publish Feature to *feature*-test-deployment branch
+on:
+  pull_request:
+    types:
+      - opened
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    name: Build and Push
+    if: github.event.pull_request.author_association == 'MEMBER' || github.event.pull_request.author_association == 'OWNER'
+    steps:
+
+      - name: Set variables
+        id: variables
+        shell: bash
+        run: |
+          echo "target-branch=${{ github.event.pull_request.head.ref }}-test-deployment" >> "$GITHUB_OUTPUT"
+          echo "src-branch=${{ github.event.pull_request.head.ref }}" >> "$GITHUB_OUTPUT"
+
+      - uses: peterjgrainger/action-create-branch@v2.2.0
+        id: create-test-deployment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          branch: ${{ steps.variables.outputs.target-branch }}
+          sha: '${{ github.event.pull_request.head.sha }}'
+
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ steps.variables.outputs.src-branch }}
+
+      - name: Unshallow repository
+        run: git fetch --unshallow origin ${{ steps.variables.outputs.src-branch }}
+
+      - name: Get last successful commit
+        id: last-successful-commit
+        uses: tylermilner/last-successful-commit-hash-action@v1
+        with:
+          workflow-id: 99826346
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          branch: development # This has to be the main branch of repository since all workflows are run from there
+
+      - name: Get commit count
+        id: commit-count
+        shell: bash
+        run: |
+          echo "Deploying $(git rev-list --count ${{ steps.last-successful-commit.outputs.commit-hash }}..${{ github.sha }})) commits!"
+          echo "commit-count=$(git rev-list --count ${{ steps.last-successful-commit.outputs.commit-hash }}..${{ github.sha }})" >> "$GITHUB_OUTPUT"
+
+      - name: Get commit author info
+        id: commit-author
+        shell: bash
+        run: |
+          AUTHOR_NAME=$(git log -1 --pretty=format:'%an' ${{ github.sha }})
+          AUTHOR_EMAIL=$(git log -1 --pretty=format:'%ae' ${{ github.sha }})
+          echo "name=$AUTHOR_NAME" >> "$GITHUB_OUTPUT"
+          echo "email=$AUTHOR_EMAIL" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        id: pnpm-install
+        with:
+          version: 9.1
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "store_path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@v3
+        name: Setup pnpm cache
+        with:
+          path: ${{ steps.pnpm-cache.outputs.store_path }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - uses: actions/cache/restore@v4
+        name: Setup Next.js cache
+        id: cache-nextjs-restore
+        with:
+          path: |
+            ${{ github.workspace }}/src/build/cache
+          # Generate a new cache whenever packages or source files change.
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('src/**/*.js', 'src/**/*.jsx', 'src/**/*.ts', 'src/**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-
+
+      - name: Install all dependencies
+        working-directory: ./src
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        working-directory: ./src
+        run: pnpm build
+
+      - name: Build cli
+        working-directory: ./src
+        run: pnpm build:cli
+
+      - uses: actions/cache/save@v4
+        name: Setup Next.js cache
+        id: cache-nextjs-save
+        with:
+          path: |
+            ${{ github.workspace }}/src/build/cache
+          key: ${{ steps.cache-nextjs-restore.outputs.cache-primary-key }}
+
+      - name: Delete files not needed in deployment
+        working-directory: ./src
+        run: rm -rf __tests__ app pages components coverage data helpers hooks moonraker env recoil server utils zods test-setup.ts vitest.config.mts tsconfig.vitest.json copy-files-from-to.json components.json postcss.config.js prettier.config.mjs tailwind.config.ts
+
+      - name: Rename src/ to app/
+        working-directory: ./
+        run: mv src app
+
+      - name: Publish to ${{ steps.variables.outputs.target-branch }}
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: .
+          commit-message: |
+            Deployed ${{ steps.commit-count.outputs.commit-count }} commit${{ steps.commit-count.outputs.commit-count > 1 && 's' || '' }}.
+            
+            https://github.com/Rat-OS/RatOS-configurator/compare/${{ steps.last-successful-commit.outputs.commit-hash }}...${{ github.sha }}
+          git-config-name: ${{ steps.commit-author.outputs.name }}
+          git-config-email: ${{ steps.commit-author.outputs.email }}
+          branch: ${{ steps.variables.outputs.target-branch }} # The branch name where you want to push the assets
+
