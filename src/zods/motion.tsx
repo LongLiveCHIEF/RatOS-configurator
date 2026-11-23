@@ -68,6 +68,8 @@ export const Driver = z
 			.or(
 				z.object({
 					type: z.enum(['TMC2240']),
+					// External reference resistor in ohms (Klipper's `rref` option).
+					rref: z.number().min(12000).max(60000),
 				}),
 			),
 	);

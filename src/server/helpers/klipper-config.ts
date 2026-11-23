@@ -776,6 +776,11 @@ export const constructKlipperConfigHelpers = async (
 					section.push(`sense_resistor: ${rail.driver.senseResistor}`);
 				}
 			}
+			// A hardware property, so it's needed with or without a preset.
+			// Kalico has no default for it.
+			if ('rref' in rail.driver) {
+				section.push(`rref: ${rail.driver.rref}`);
+			}
 			return section.join('\n') + '\n';
 		},
 		renderSpeedLimits() {

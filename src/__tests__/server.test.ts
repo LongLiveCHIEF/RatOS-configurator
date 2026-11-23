@@ -604,6 +604,14 @@ describe('server', async () => {
 				// Expect gear_ratio to be present in splitRes
 				expect(splitRes.filter((l) => l.includes('gear_ratio:')).length).toBe(5);
 			});
+			test('sets rref for the TMC2240 extruder driver', async () => {
+				const start = splitRes.findIndex((l) => l.trim() === '[tmc2240 extruder]');
+				expect(start, 'missing [tmc2240 extruder] section').toBeGreaterThan(-1);
+				const end = splitRes.findIndex((l, i) => i > start && l.startsWith('['));
+				const section = splitRes.slice(start, end === -1 ? undefined : end);
+				expect(section).toContain('rref: 12000');
+				expect(section.some((l) => l.startsWith('sense_resistor:'))).toBe(false);
+			});
 		});
 	});
 	describe('printer defaults', async () => {
