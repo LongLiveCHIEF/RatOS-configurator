@@ -1,5 +1,5 @@
 import { existsSync } from 'fs';
-import { symlink, appendFile, unlink } from 'fs/promises';
+import { symlink, appendFile, unlink, lstat, readlink } from 'fs/promises';
 import path from 'path';
 import { z } from 'zod';
 import { replaceInFileByLine, searchFileByLine } from '@/server/helpers/file-operations';
@@ -18,6 +18,21 @@ const options = z.object({
 
 export type Extension = z.infer<typeof extension>;
 export type Options = z.infer<typeof options>;
+
+const lstatOrNull = (filePath: string) => lstat(filePath).catch(() => null);
+
+/**
+ * Whether `destination` is a symlink to `source`, which is how RatOS links extensions.
+ * Dangling symlinks count, so that links to removed extension files can be cleaned up.
+ */
+const isSymlinkTo = async (destination: string, source: string) => {
+	const destinationStat = await lstatOrNull(destination);
+	if (destinationStat == null || !destinationStat.isSymbolicLink()) {
+		return false;
+	}
+	const target = await readlink(destination).catch(() => null);
+	return target != null && path.resolve(path.dirname(destination), target) === source;
+};
 
 interface SymlinkExtensionsProps<T extends Extension> {
 	extensions: T[];
@@ -41,9 +56,18 @@ export const symlinkExtensions = async <T extends Extension>(props: SymlinkExten
 				ext.fileName,
 			);
 			const destination = path.resolve(path.join(props.gitRepoPath, relativeDestination));
+			const destinationStat = await lstatOrNull(destination);
 			const symlinkExists = existsSync(destination);
 			if (existsSync(path.resolve(path.join(ext.path, ext.fileName)))) {
 				cleanedUpExtensions.push(ext);
+				if (destinationStat != null && !destinationStat.isSymbolicLink()) {
+					// A regular file means the Klipper repository ships its own module with this name
+					// (for example Kalico's gcode_shell_command.py). Never replace or exclude it.
+					return {
+						result: 'error',
+						message: `"${relativeDestination}" is provided by Klipper itself, so "${ext.fileName}" from "${ext.path}" was not linked.`,
+					};
+				}
 				const excludeLine = new RegExp(`^${relativeDestination}$`);
 				const isExcluded = await searchFileByLine(gitExcludePath, excludeLine);
 				try {
@@ -71,7 +95,7 @@ export const symlinkExtensions = async <T extends Extension>(props: SymlinkExten
 					};
 				}
 			} else {
-				if (symlinkExists) {
+				if (destinationStat?.isSymbolicLink()) {
 					const result = await unlinkExtension({
 						extension: ext,
 						gitRepoPath: props.gitRepoPath,
@@ -121,14 +145,22 @@ export const unlinkExtension = async <T extends Extension>(
 	);
 	const gitExcludePath = path.resolve(props.gitRepoPath, '.git', 'info', 'exclude');
 	const destination = path.resolve(path.join(props.gitRepoPath, relativeDestination));
-	if (existsSync(path.resolve(path.join(ext.path, ext.fileName)))) {
+	const source = path.resolve(path.join(ext.path, ext.fileName));
+	// Only ever remove RatOS's own symlink, never a file or link that belongs to the Klipper repository.
+	const isOwnSymlink = await isSymlinkTo(destination, source);
+	if (isOwnSymlink || existsSync(source)) {
 		const excludeLine = new RegExp(`^${relativeDestination}$`);
 		// Remove extension from git exclude file
 		await replaceInFileByLine(gitExcludePath, excludeLine, null);
-		const symlinkExists = existsSync(destination);
+		const destinationExists = (await lstatOrNull(destination)) != null;
 		try {
-			if (symlinkExists === true) {
+			if (isOwnSymlink) {
 				await unlink(destination);
+			} else if (destinationExists) {
+				return {
+					result: 'success',
+					message: `"${relativeDestination}" is not a RatOS symlink for "${ext.fileName}". Leaving it in place.`,
+				};
 			} else if (props.options?.errorIfNotExists) {
 				throw new TRPCError({
 					code: 'PRECONDITION_FAILED',
@@ -137,7 +169,7 @@ export const unlinkExtension = async <T extends Extension>(
 			}
 			return {
 				result: 'success',
-				message: symlinkExists
+				message: isOwnSymlink
 					? `Symlink for "${ext.fileName}" has been removed.`
 					: `Symlink for "${ext.fileName}" doesn't exist. Skipping.`,
 			};
