@@ -249,16 +249,40 @@ EOF
 
 # klipper_ships_module() - Succeeds when the Klipper repository provides a module itself
 #
-# RatOS only ever creates symlinks inside the Klipper repository, so a regular file at the
-# path means Klipper ships its own module with that name (for example Kalico's
-# klippy/extras/gcode_shell_command.py).
+# RatOS only ever adds untracked symlinks to the Klipper repository, so a tracked path means
+# Klipper ships its own module with that name (for example Kalico's
+# klippy/extras/gcode_shell_command.py). Asking git instead of looking at the file still works
+# after an earlier configurator version removed the module.
 #
 # PARAMETERS:
 #   $1 - Path relative to KLIPPER_DIR
 klipper_ships_module()
 {
-	local file="${KLIPPER_DIR}/$1"
-	[ -f "$file" ] && [ ! -L "$file" ]
+	run_as_user "${RATOS_USERNAME}" git -C "$KLIPPER_DIR" ls-files --error-unmatch -- "$1" >/dev/null 2>&1
+}
+
+# clean_up_retired_module() - Leaves the path of a retired extension as Klipper has it
+#
+# ratos-update.sh runs while the previous configurator server still handles `ratos extensions`
+# commands. Versions before the Kalico switch unregister an extension by deleting whatever is at
+# its path, which removes a module that Klipper tracks, and they leave a dangling symlink when
+# the extension's file is gone. Restore tracked modules from git and remove dangling symlinks.
+#
+# PARAMETERS:
+#   $1 - Path relative to KLIPPER_DIR
+clean_up_retired_module()
+{
+	local module="$1"
+	local file="${KLIPPER_DIR}/${module}"
+	if klipper_ships_module "$module"; then
+		if ! run_as_user "${RATOS_USERNAME}" git -C "$KLIPPER_DIR" diff --quiet -- "$module"; then
+			echo "Restoring $module from the Klipper repository..."
+			run_as_user "${RATOS_USERNAME}" git -C "$KLIPPER_DIR" checkout -- "$module"
+		fi
+	elif [ -L "$file" ] && [ ! -e "$file" ]; then
+		echo "Removing dangling symlink $module..."
+		rm -f "$file"
+	fi
 }
 
 verify_registered_extensions()
@@ -289,13 +313,14 @@ verify_registered_extensions()
 		["ratos_hybrid_corexy"]=$(realpath "${RATOS_PRINTER_DATA_DIR}/config/RatOS/klippy/kinematics/ratos_hybrid_corexy.py")
 	)
 
-	# Extensions that RatOS no longer uses. Any that are still registered get unregistered.
+	# Extensions that RatOS no longer uses, with their paths relative to KLIPPER_DIR. Any that
+	# are still registered get unregistered, and their paths are cleaned up.
 	declare -A retired_extensions=()
 	# Kalico ships its own gcode_shell_command module, which takes the same options as
 	# RatOS's copy. Only use RatOS's copy when the Klipper repository doesn't provide one.
 	if klipper_ships_module "klippy/extras/gcode_shell_command.py"; then
 		unset 'expected_extensions[gcode_shell_extension]'
-		retired_extensions["gcode_shell_extension"]=1
+		retired_extensions["gcode_shell_extension"]="klippy/extras/gcode_shell_command.py"
 	fi
 	declare -A expected_moonraker_extensions=(
 		["timelapse"]=$(realpath "${RATOS_USER_HOME}/moonraker-timelapse/component/timelapse.py")
@@ -385,6 +410,10 @@ verify_registered_extensions()
 			fi
         fi
     done < <(ratos extensions list --non-interactive)
+
+	for ext_name in "${!retired_extensions[@]}"; do
+		clean_up_retired_module "${retired_extensions[$ext_name]}"
+	done
 
     # Check for missing expected extensions
     for ext_name in "${!expected_extensions[@]}"; do
