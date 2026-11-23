@@ -247,6 +247,20 @@ EOF
 	echo "RatOS git hooks has successfully been whitelisted!"
 }
 
+# klipper_ships_module() - Succeeds when the Klipper repository provides a module itself
+#
+# RatOS only ever creates symlinks inside the Klipper repository, so a regular file at the
+# path means Klipper ships its own module with that name (for example Kalico's
+# klippy/extras/gcode_shell_command.py).
+#
+# PARAMETERS:
+#   $1 - Path relative to KLIPPER_DIR
+klipper_ships_module()
+{
+	local file="${KLIPPER_DIR}/$1"
+	[ -f "$file" ] && [ ! -L "$file" ]
+}
+
 verify_registered_extensions()
 {
     report_status "Verifying registered Klipper extensions..."
@@ -275,6 +289,14 @@ verify_registered_extensions()
 		["ratos_hybrid_corexy"]=$(realpath "${RATOS_PRINTER_DATA_DIR}/config/RatOS/klippy/kinematics/ratos_hybrid_corexy.py")
 	)
 
+	# Extensions that RatOS no longer uses. Any that are still registered get unregistered.
+	declare -A retired_extensions=()
+	# Kalico ships its own gcode_shell_command module, which takes the same options as
+	# RatOS's copy. Only use RatOS's copy when the Klipper repository doesn't provide one.
+	if klipper_ships_module "klippy/extras/gcode_shell_command.py"; then
+		unset 'expected_extensions[gcode_shell_extension]'
+		retired_extensions["gcode_shell_extension"]=1
+	fi
 	declare -A expected_moonraker_extensions=(
 		["timelapse"]=$(realpath "${RATOS_USER_HOME}/moonraker-timelapse/component/timelapse.py")
 	)
@@ -303,6 +325,12 @@ verify_registered_extensions()
         if [[ "$line" =~ [[:space:]]*([A-Za-z0-9_]+)[[:space:]]*-\>[[:space:]]*([^[:space:]].+)[[:space:]]*$ ]]; then
             ext_name="${BASH_REMATCH[1]}"
             filepath="${BASH_REMATCH[2]}"
+			# Unregister extensions that RatOS no longer uses
+			if [[ "$extension_type" == "klipper" ]] && [[ -v retired_extensions["$ext_name"] ]]; then
+				echo "Unregistering retired klipper extension $ext_name..."
+				ratos extensions unregister klipper "$ext_name"
+				continue
+			fi
 
 			# Check if it's a kinematics extension
 			if [[ -v kinematics_extensions["$ext_name"] ]]; then
