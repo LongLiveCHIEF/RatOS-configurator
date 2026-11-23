@@ -26,7 +26,7 @@ mkdir -p "$PRINTER_DATA_DIR/logs"
 mkdir -p "$PRINTER_DATA_DIR/ratos-data"
 
 # Clone RatOS's Kalico-based Klipper fork pinned to commit from moonraker.conf
-git clone --branch ratos/v2.1.x https://github.com/Rat-OS/kalico.git "$KLIPPER_DIR"
+git clone --branch add-ratos-dependent-features https://github.com/LongLiveCHIEF/kalico.git "$KLIPPER_DIR"
 cd "$KLIPPER_DIR" || exit 1
 KLIPPER_COMMIT=$(grep -A2 "\[update_manager klipper\]" "$CONFIGURATOR_ROOT_DIR/configuration/moonraker.conf" | grep "pinned_commit:" | cut -d' ' -f2)
 git checkout "$KLIPPER_COMMIT"

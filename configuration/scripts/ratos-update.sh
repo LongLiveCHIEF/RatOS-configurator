@@ -542,9 +542,9 @@ symlink_extensions()
 # - Unsupported repository sources (fatal error)
 # - All edge cases including detached HEAD, uncommitted changes, etc.
 #
-# The RatOS fork is based on Kalico (Rat-OS/kalico). When the migration changes the Klipper
-# commit, KLIPPER_SOURCE_CHANGED is set so that flash_mcus_after_klipper_source_change
-# flashes connected MCUs at the end of the update.
+# The RatOS fork is based on Kalico (RATOS_FORK_URL in klipper-fork-migration.sh). When the
+# migration changes the Klipper commit, KLIPPER_SOURCE_CHANGED is set so that
+# flash_mcus_after_klipper_source_change flashes connected MCUs at the end of the update.
 #
 # RETURN CODES:
 #   0 - Success: Migration completed successfully or was not needed
