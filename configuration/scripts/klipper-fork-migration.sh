@@ -163,11 +163,17 @@ run_git() {
 
 # Migration constants (readonly to prevent accidental modification)
 readonly OFFICIAL_KLIPPER_URL="https://github.com/Klipper3d/klipper.git"
-readonly RATOS_FORK_URL="https://github.com/Rat-OS/klipper.git"
+# RatOS's Kalico-based fork, which carries the features RatOS depends on
+readonly RATOS_FORK_URL="https://github.com/Rat-OS/kalico.git"
+# Sources that are migrated to RATOS_FORK_URL
 readonly DEPRECATED_FORK_URLS=(
+	"https://github.com/Rat-OS/klipper.git" # previous RatOS fork of Klipper
+	"https://github.com/KalicoCrew/kalico.git" # stock Kalico, without RatOS's features
 	"https://github.com/tg73/klipper.git" # tg73 fork sometimes used during development
 )
 readonly RATOS_FORK_REMOTE="ratos-fork"
+# Branch on RATOS_FORK_URL. Keeping the previous fork's branch name means printers that already
+# have a local ratos/v2.1.x branch reuse it, and are reset to the new commit.
 readonly TARGET_BRANCH="ratos/v2.1.x"
 readonly MOONRAKER_CONF_PATH="$SCRIPT_DIR/../moonraker.conf"
 
@@ -409,10 +415,11 @@ check_klipper_repository()
     fi
 
     # Case 4: Any Other Remote/Source → Fatal Error
-    log_error "Repository is using an unsupported remote source. Only official Klipper or RatOS fork repositories are supported." "check_repository" "UNSUPPORTED_REPOSITORY_SOURCE"
+    log_error "Repository is using an unsupported remote source. Only official Klipper, Kalico or RatOS fork repositories are supported." "check_repository" "UNSUPPORTED_REPOSITORY_SOURCE"
     log_error "Current origin URL: $current_origin" "check_repository" "UNSUPPORTED_REPOSITORY_SOURCE"
     log_error "Supported sources:" "check_repository" "UNSUPPORTED_REPOSITORY_SOURCE"
     log_error "  - Official Klipper: ${official_urls[*]}" "check_repository" "UNSUPPORTED_REPOSITORY_SOURCE"
+    log_error "  - Migrated from: ${DEPRECATED_FORK_URLS[*]}" "check_repository" "UNSUPPORTED_REPOSITORY_SOURCE"
     log_error "  - RatOS Fork: $RATOS_FORK_URL" "check_repository" "UNSUPPORTED_REPOSITORY_SOURCE"
     return 2  # Fatal error
 }

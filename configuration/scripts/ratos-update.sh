@@ -542,13 +542,21 @@ symlink_extensions()
 # - Unsupported repository sources (fatal error)
 # - All edge cases including detached HEAD, uncommitted changes, etc.
 #
+# The RatOS fork is based on Kalico (Rat-OS/kalico). When the migration changes the Klipper
+# commit, KLIPPER_SOURCE_CHANGED is set so that flash_mcus_after_klipper_source_change
+# flashes connected MCUs at the end of the update.
+#
 # RETURN CODES:
 #   0 - Success: Migration completed successfully or was not needed
 #   1+ - Error: Migration failed (specific error codes from migration script)
 #
+KLIPPER_SOURCE_CHANGED=false
 ensure_klipper_fork_migration()
 {
 	log_info "Ensuring Klipper repository is properly configured..." "ensure_klipper_migration"
+
+	local head_before head_after
+	head_before=$(run_as_user "${RATOS_USERNAME}" git -C "$KLIPPER_DIR" rev-parse HEAD 2>/dev/null || echo "")
 
 	# Delegate all repository validation and migration logic to the dedicated script
 	# The migration script handles all scenarios comprehensively:
@@ -563,7 +571,37 @@ ensure_klipper_fork_migration()
 		return $code
 	fi
 
+	head_after=$(run_as_user "${RATOS_USERNAME}" git -C "$KLIPPER_DIR" rev-parse HEAD 2>/dev/null || echo "")
+	if [[ -n "$head_after" ]] && [[ "$head_after" != "$head_before" ]]; then
+		log_info "Klipper source changed from ${head_before:-unknown} to $head_after." "ensure_klipper_migration"
+		KLIPPER_SOURCE_CHANGED=true
+	fi
+
 	log_info "Klipper repository configuration verified successfully!" "ensure_klipper_migration"
+	return 0
+}
+
+# flash_mcus_after_klipper_source_change() - Flashes connected MCUs after a Klipper migration
+#
+# Moonraker's Klipper updates flash MCUs through Klipper's post-merge hook, but the migration
+# switches commits with checkout and reset, which doesn't run that hook. Run the same script
+# here so MCU firmware matches the new Klipper source. Flashing restarts the Klipper service,
+# so this runs after the Python requirements and extensions for the new source are in place.
+#
+# RETURN CODES:
+#   0 - Success, or the Klipper source didn't change
+#   1 - klipper-mcu-update.sh failed
+#
+flash_mcus_after_klipper_source_change()
+{
+	if [[ "$KLIPPER_SOURCE_CHANGED" != true ]]; then
+		return 0
+	fi
+	log_info "Flashing connected MCUs for the new Klipper source..." "flash_mcus"
+	if ! "$SCRIPT_DIR"/klipper-mcu-update.sh; then
+		log_error "Updating MCUs after the Klipper source change failed. Flash them from the RatOS configurator before printing." "flash_mcus" "KLIPPER_MCU_UPDATE_FAILED"
+		return 1
+	fi
 	return 0
 }
 
@@ -594,6 +632,7 @@ main() {
 	remove_old_postprocessor || exit_code=1
 	verify_registered_extensions || exit_code=1
 	symlink_extensions || exit_code=1
+	flash_mcus_after_klipper_source_change || exit_code=1
 	update_beacon_fw || exit_code=1
 
 	# Re-enable exit on error for cleanup

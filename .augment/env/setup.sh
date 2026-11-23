@@ -25,10 +25,10 @@ mkdir -p "$PRINTER_DATA_DIR/config"
 mkdir -p "$PRINTER_DATA_DIR/logs"
 mkdir -p "$PRINTER_DATA_DIR/ratos-data"
 
-# Clone Klipper pinned to commit from moonraker.conf
-git clone https://github.com/Klipper3d/klipper.git "$KLIPPER_DIR"
+# Clone RatOS's Kalico-based Klipper fork pinned to commit from moonraker.conf
+git clone --branch ratos/v2.1.x https://github.com/Rat-OS/kalico.git "$KLIPPER_DIR"
 cd "$KLIPPER_DIR" || exit 1
-KLIPPER_COMMIT=$(grep -A1 "\[update_manager klipper\]" "$CONFIGURATOR_ROOT_DIR/configuration/moonraker.conf" | grep "pinned_commit:" | cut -d' ' -f2)
+KLIPPER_COMMIT=$(grep -A2 "\[update_manager klipper\]" "$CONFIGURATOR_ROOT_DIR/configuration/moonraker.conf" | grep "pinned_commit:" | cut -d' ' -f2)
 git checkout "$KLIPPER_COMMIT"
 cd "$CONFIGURATOR_ROOT_DIR" || exit 1
 mkdir -p "$KLIPPER_ENV_DIR"
@@ -36,7 +36,7 @@ mkdir -p "$KLIPPER_ENV_DIR"
 # Clone Moonraker pinned to commit from moonraker.conf
 git clone https://github.com/Arksine/moonraker.git "$MOONRAKER_DIR"
 cd "$MOONRAKER_DIR" || exit 1
-MOONRAKER_COMMIT=$(grep -A1 "\[update_manager moonraker\]" /mnt/persist/workspace/configuration/moonraker.conf | grep "pinned_commit:" | cut -d' ' -f2)
+MOONRAKER_COMMIT=$(grep -A2 "\[update_manager moonraker\]" /mnt/persist/workspace/configuration/moonraker.conf | grep "pinned_commit:" | cut -d' ' -f2)
 git checkout "$MOONRAKER_COMMIT"
 
 cd "$CONFIGURATOR_ROOT_DIR/src" || exit 1
