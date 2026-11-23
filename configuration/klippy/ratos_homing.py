@@ -8,6 +8,25 @@
 # Modified by Mikkel Schmidt <mikkel.schmidt@gmail.com>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
+import inspect
+
+def set_position_homing_z(toolhead, pos):
+    # Kalico and current Klipper take homing axes as letters ("z"). Older
+    # Klipper took axis indexes ([2]) and ignores letters.
+    params = inspect.signature(toolhead.set_position).parameters
+    homing_axes = params.get("homing_axes")
+    if homing_axes is not None and isinstance(homing_axes.default, str):
+        toolhead.set_position(pos, homing_axes="z")
+    else:
+        toolhead.set_position(pos, homing_axes=[2])
+
+def clear_z_homed(kin):
+    # Kalico and current Klipper use clear_homing_state(); older Klipper
+    # used note_z_not_homed().
+    if hasattr(kin, "clear_homing_state"):
+        kin.clear_homing_state("z")
+    elif hasattr(kin, "note_z_not_homed"):
+        kin.note_z_not_homed()
 
 class RatOSHoming:
     def __init__(self, config):
@@ -39,11 +58,10 @@ class RatOSHoming:
                 if 'z' not in kin_status['homed_axes']:
                     # Always perform the z_hop if the Z axis is not homed
                     pos[2] = 0
-                    toolhead.set_position(pos, homing_axes=[2])
+                    set_position_homing_z(toolhead, pos)
                     toolhead.manual_move([None, None, self.z_hop],
                                         self.z_hop_speed)
-                    if hasattr(toolhead.get_kinematics(), "note_z_not_homed"):
-                        toolhead.get_kinematics().note_z_not_homed()
+                    clear_z_homed(toolhead.get_kinematics())
                 elif pos[2] < self.z_hop:
                     # If the Z axis is homed, and below z_hop, lift it to z_hop
                     toolhead.manual_move([None, None, self.z_hop],
