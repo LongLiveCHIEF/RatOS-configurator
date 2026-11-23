@@ -1,2 +1,2 @@
 # This file lists the Python package dependencies for RatOS Klipper extensions
-pygam==0.9.1
+pygam==0.10.1
