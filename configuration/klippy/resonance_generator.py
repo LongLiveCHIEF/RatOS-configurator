@@ -18,6 +18,14 @@ class VibrationGenerator:
         # Resonate for 1 second by default
         self.time = 1
 
+    def _set_max_accel(self, toolhead, accel):
+        if hasattr(toolhead, "set_max_velocities"):
+            # Kalico and current Klipper moved M204 out of the toolhead
+            toolhead.set_max_velocities(None, accel, None, None)
+        else:
+            toolhead.cmd_M204(self.gcode.create_gcode_command(
+                "M204", "M204", {"S": accel}))
+
     def prepare_test(self, gcmd):
         self.freq = gcmd.get_float("FREQ", None, minval=1., maxval=300.)
         if self.freq is None:
@@ -56,8 +64,7 @@ class VibrationGenerator:
             t_seg = .25 / freq
             accel = self.accel_per_hz * freq
             max_v = accel * t_seg
-            toolhead.cmd_M204(self.gcode.create_gcode_command(
-                "M204", "M204", {"S": accel}))
+            self._set_max_accel(toolhead, accel)
             L = .5 * accel * t_seg**2
             dX, dY = axis.get_point(L)
             nX = X + sign * dX
