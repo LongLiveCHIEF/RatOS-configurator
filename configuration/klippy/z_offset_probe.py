@@ -4,9 +4,17 @@
 # Modified by Helge Keck <HelgeKeck@hotmail.com.com>
 #
 # This file may be distributed under the terms of the GNU GPLv3 license.
+import inspect
 import logging
 import pins
 from . import manual_probe
+
+def probing_move(phoming, mcu_probe, pos, speed, gcmd):
+    # Kalico requires the G-code command for probing moves. Klipper doesn't
+    # take one, and its fourth parameter (check_movement) means something else.
+    if "gcmd" in inspect.signature(phoming.probing_move).parameters:
+        return phoming.probing_move(mcu_probe, pos, speed, gcmd)
+    return phoming.probing_move(mcu_probe, pos, speed)
 
 HINT_TIMEOUT = """
 If the probe did not move far enough to trigger, then
@@ -102,7 +110,7 @@ class ZOffsetProbe:
         if gcmd is not None:
             return gcmd.get_float("LIFT_SPEED", self.lift_speed, above=0.)
         return self.lift_speed
-    def _probe(self, speed):
+    def _probe(self, speed, gcmd=None):
         toolhead = self.printer.lookup_object('toolhead')
         curtime = self.printer.get_reactor().monotonic()
         if 'z' not in toolhead.get_status(curtime)['homed_axes']:
@@ -111,7 +119,7 @@ class ZOffsetProbe:
         pos = toolhead.get_position()
         pos[2] = self.z_position
         try:
-            epos = phoming.probing_move(self.mcu_probe, pos, speed)
+            epos = probing_move(phoming, self.mcu_probe, pos, speed, gcmd)
             epos[0] = pos[0]
             epos[1] = pos[1]
         except self.printer.command_error as e:
@@ -167,7 +175,7 @@ class ZOffsetProbe:
         positions = []
         while len(positions) < sample_count:
             # Probe position
-            pos = self._probe(speed)
+            pos = self._probe(speed, gcmd)
             if samples_drop > 0:
                 samples_drop -= 1
                 # Retract
@@ -232,7 +240,7 @@ class ZOffsetProbe:
         positions = []
         while len(positions) < sample_count:
             # Probe position
-            pos = self._probe(speed)
+            pos = self._probe(speed, gcmd)
             positions.append(pos)
             # Retract
             liftpos = [None, None, pos[2] + sample_retract_dist]
