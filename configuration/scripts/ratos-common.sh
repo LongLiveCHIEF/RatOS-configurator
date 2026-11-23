@@ -309,13 +309,15 @@ verify_registered_extensions()
 		["ratos_dual_carriage_extras"]=$(realpath "${RATOS_PRINTER_DATA_DIR}/config/RatOS/klippy/ratos_dual_carriage_extras.py")
     )
 
-	declare -A kinematics_extensions=(
-		["ratos_hybrid_corexy"]=$(realpath "${RATOS_PRINTER_DATA_DIR}/config/RatOS/klippy/kinematics/ratos_hybrid_corexy.py")
-	)
+	# Kinematics extensions are linked into klippy/kinematics. RatOS currently has none.
+	declare -A kinematics_extensions=()
 
 	# Extensions that RatOS no longer uses, with their paths relative to KLIPPER_DIR. Any that
 	# are still registered get unregistered, and their paths are cleaned up.
-	declare -A retired_extensions=()
+	declare -A retired_extensions=(
+		# Replaced by Kalico's hybrid_corexy kinematics with invert_kinematics: True
+		["ratos_hybrid_corexy"]="klippy/kinematics/ratos_hybrid_corexy.py"
+	)
 	# Kalico ships its own gcode_shell_command module, which takes the same options as
 	# RatOS's copy. Only use RatOS's copy when the Klipper repository doesn't provide one.
 	if klipper_ships_module "klippy/extras/gcode_shell_command.py"; then
