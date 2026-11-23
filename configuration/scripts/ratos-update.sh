@@ -74,8 +74,11 @@ ensure_pip_requirements()
 	log_info "Ensuring Python pip requirements are installed in KLIPPER_ENV" "ensure_pip_requirements"
 	report_status "Installing Python requirements into Klipper env"
 
-	local req_file py_bin pip_bin
+	local req_file klipper_req_file py_bin pip_bin
 	req_file="${SCRIPT_DIR}/../klippy/requirements.txt"
+	# Klipper's own requirements. Moonraker installs these when it updates Klipper,
+	# but not after klipper-fork-migration.sh switches the Klipper source.
+	klipper_req_file="${KLIPPER_DIR}/scripts/klippy-requirements.txt"
 	py_bin="${KLIPPER_ENV}/bin/python"
 	pip_bin="${KLIPPER_ENV}/bin/pip"
 
@@ -124,12 +127,22 @@ ensure_pip_requirements()
 		fi
 	done < "$req_file"
 
+	# Install Klipper's and RatOS's requirements in one pip run, so that pip resolves
+	# them together (for example Kalico's numpy pin and RatOS's pygam pin).
+	local -a req_args=()
+	if [ -f "$klipper_req_file" ]; then
+		req_args+=(-r "$klipper_req_file")
+	else
+		log_warn "Klipper requirements file not found: $klipper_req_file" "ensure_pip_requirements" "KLIPPER_REQUIREMENTS_FILE_MISSING"
+	fi
+	req_args+=(-r "$req_file")
+
 	# Install requirements with verbose output to capture what gets installed
-	log_info "Installing pip requirements from $req_file..." "ensure_pip_requirements"
-	echo "Installing pip requirements from $req_file..."
+	log_info "Installing pip requirements: ${req_args[*]}" "ensure_pip_requirements"
+	echo "Installing pip requirements: ${req_args[*]}"
 	
 	local install_output install_result
-	install_output=$(run_as_user "${RATOS_USERNAME}" "$py_bin" -m pip install -r "$req_file" 2>&1)
+	install_output=$(run_as_user "${RATOS_USERNAME}" "$py_bin" -m pip install "${req_args[@]}" 2>&1)
 	install_result=$?
 	
 	if [[ $install_result -ne 0 ]]; then
