@@ -81,10 +81,10 @@ The branch command runs the update itself, so there's nothing else to start. It 
 Don't power off the printer during step 7. When the command finishes, check the log for the key lines:
 
 ```bash
-grep -E "migration completed|Klipper source changed|Flashing connected MCUs|update completed" ~/printer_data/logs/ratos-configurator.log | tail
+grep -E "migration completed|Klipper source changed|Flashing connected MCUs|MCU_FLASH_FAILED|MCU_LEFT_IN_DFU|update completed" ~/printer_data/logs/ratos-configurator.log | tail
 ```
 
-You should see that the migration completed, that the Klipper source changed to `201470df…`, that MCUs were flashed, and `RatOS update completed successfully`.
+You should see that the migration completed, that the Klipper source changed to `201470df…`, that MCUs were flashed, and `RatOS update completed successfully`. A line with `MCU_FLASH_FAILED` names a board that didn't flash, and `MCU_LEFT_IN_DFU` means a board is still in DFU mode. Flash those boards from the RatOS configurator before printing.
 
 If a step fails, save the log first. Then run `ratos doctor`, which runs the same update again. If only flashing failed, flash those boards from the RatOS configurator in your browser.
 
