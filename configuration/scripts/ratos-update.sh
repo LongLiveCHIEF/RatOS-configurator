@@ -588,9 +588,12 @@ ensure_klipper_fork_migration()
 # here so MCU firmware matches the new Klipper source. Flashing restarts the Klipper service,
 # so this runs after the Python requirements and extensions for the new source are in place.
 #
+# A board that fails to flash doesn't fail the update. flash-path.sh logs a warning naming the
+# board, and this function warns when a board is left in DFU mode, which also covers boards
+# that are flashed by other scripts.
+#
 # RETURN CODES:
-#   0 - Success, or the Klipper source didn't change
-#   1 - klipper-mcu-update.sh failed
+#   0 - Always
 #
 flash_mcus_after_klipper_source_change()
 {
@@ -599,8 +602,12 @@ flash_mcus_after_klipper_source_change()
 	fi
 	log_info "Flashing connected MCUs for the new Klipper source..." "flash_mcus"
 	if ! "$SCRIPT_DIR"/klipper-mcu-update.sh; then
-		log_error "Updating MCUs after the Klipper source change failed. Flash them from the RatOS configurator before printing." "flash_mcus" "KLIPPER_MCU_UPDATE_FAILED"
-		return 1
+		log_warn "Updating MCUs after the Klipper source change failed. Flash them from the RatOS configurator before printing." "flash_mcus" "KLIPPER_MCU_UPDATE_FAILED"
+	fi
+	local dfu_devices
+	dfu_devices=$(lsusb | grep -c "0483:df11")
+	if [[ "$dfu_devices" -gt 0 ]]; then
+		log_warn "$dfu_devices board(s) are still in DFU mode (USB ID 0483:df11) after flashing. Flash them from the RatOS configurator before printing." "flash_mcus" "MCU_LEFT_IN_DFU"
 	fi
 	return 0
 }
