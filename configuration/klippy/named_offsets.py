@@ -122,7 +122,8 @@ class NamedOffsetManager:
 		self.gcode_move = self.printer.lookup_object('gcode_move')
 		self.next_transform = self.gcode_move.set_move_transform(self, force=True)
 
-	def _handle_motor_off(self, print_time):
+	# Klipper passes print_time with the stepper_enable:motor_off event, Kalico passes nothing.
+	def _handle_motor_off(self, print_time=None):
 		self.reset_on_event('motor_off')
 
 	def _override_command(self, cmd_name, new_cmd, *, when_not_ready:bool=False):
