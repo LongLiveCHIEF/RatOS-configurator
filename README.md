@@ -1,5 +1,7 @@
 # RatOS Configurator
 
+**Note: for instructions on the Kalico migration, see [migration-to-kalico](migration-to-kalico.md)**
+
 This is the repository for the [RatOS](os.ratrig.com) configurator - a 3d printer provisioning application for RatOS with config generation, board identification, provisioning and automatic flashing. 
 
 ## Contributing
