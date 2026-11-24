@@ -12,6 +12,22 @@ import {
 	type LogEntry,
 } from '@/server/routers/update-logs';
 
+// readObjects logs malformed lines through the server logger. Its pino file transport opens
+// LOG_FILE asynchronously in a worker thread, and these tests point LOG_FILE into TEST_LOG_DIR and
+// delete that directory after each test. When the worker started late, it opened the file after
+// the directory was gone, and the run failed with an unhandled ENOENT.
+vi.mock('@/server/helpers/logger', () => {
+	const logger = {
+		trace: vi.fn(),
+		debug: vi.fn(),
+		info: vi.fn(),
+		warn: vi.fn(),
+		error: vi.fn(),
+		fatal: vi.fn(),
+	};
+	return { getLogger: () => logger };
+});
+
 // Test environment setup - relies on test-setup.ts and .env.test.local
 const TEST_LOG_DIR = path.join(tmpdir(), 'ratos-test-logs');
 const TEST_LOG_FILE = path.join(TEST_LOG_DIR, 'ratos-update.log');
